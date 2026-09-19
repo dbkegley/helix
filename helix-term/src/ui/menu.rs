@@ -1,4 +1,5 @@
 use crate::{
+    alt,
     compositor::{Callback, Component, Compositor, Context, Event, EventResult},
     ctrl, key, shift,
 };
@@ -287,14 +288,14 @@ impl<T: Item + 'static> Component for Menu<T> {
                 (self.callback_fn)(cx.editor, self.selection(), MenuEvent::Abort);
                 return EventResult::Consumed(close_fn);
             }
-            // arrow up/ctrl-p/shift-tab prev completion choice (including updating the doc)
-            shift!(Tab) | key!(Up) | ctrl!('p') => {
+            // arrow up/alt-k/shift-tab prev completion choice (including updating the doc)
+            shift!(Tab) | key!(Up) | alt!('k') => {
                 self.move_up();
                 (self.callback_fn)(cx.editor, self.selection(), MenuEvent::Update);
                 return EventResult::Consumed(None);
             }
-            key!(Tab) | key!(Down) | ctrl!('n') => {
-                // arrow down/ctrl-n/tab advances completion choice (including updating the doc)
+            key!(Tab) | key!(Down) | alt!('j') => {
+                // arrow down/alt-j/tab advances completion choice (including updating the doc)
                 self.move_down();
                 (self.callback_fn)(cx.editor, self.selection(), MenuEvent::Update);
                 return EventResult::Consumed(None);
@@ -339,7 +340,7 @@ impl<T: Item + 'static> Component for Menu<T> {
             _ => (),
         }
         // for some events, we want to process them but send ignore, specifically all input except
-        // tab/enter/ctrl-k or whatever will confirm the selection/ ctrl-n/ctrl-p for scroll.
+        // tab/enter/ctrl-k or whatever will confirm the selection/ alt-j/alt-k for scroll.
         // EventResult::Consumed(None)
         EventResult::Ignored(None)
     }
