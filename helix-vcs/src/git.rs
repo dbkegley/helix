@@ -132,16 +132,22 @@ fn open_repo(path: &Path, trust_full: bool) -> Result<ThreadSafeRepository> {
     };
     let (repo_path, _trust_from_ownership) = gix::discover::upwards_opts(path, discover_options)
         .context("failed to discover git repo")?;
-    let (git_dir, _work_dir) = repo_path.into_repository_and_work_tree_directories();
+    let (git_dir, work_dir) = repo_path.into_repository_and_work_tree_directories();
+
+    // Open via the work tree's `.git` so gix resolves relative linked-worktree paths (as written
+    // by jj workspaces) correctly. Bare repositories fall back to `git_dir`.
+    let open_path = work_dir.map_or(git_dir, |work_dir| {
+        work_dir.join(gix::discover::DOT_GIT_DIR)
+    });
 
     let options = gix::open::Options::default()
         .permissions(permissions)
-        // `git_dir` is the discovered `.git` directory (or a linked-worktree git dir), so open it
+        // `open_path` already is a `.git` directory, `.git` file or bare repository, so open it
         // as-is rather than letting gix append `.git` again.
         .open_path_as_is(true)
         .with(trust);
 
-    Ok(ThreadSafeRepository::open_opts(git_dir, options)?)
+    Ok(ThreadSafeRepository::open_opts(open_path, options)?)
 }
 
 /// Emulates the result of running `git status` from the command line.

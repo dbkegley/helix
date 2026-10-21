@@ -156,3 +156,46 @@ fn symlink_to_git_repo() {
     assert_eq!(git::get_diff_base(&file_link, true).unwrap(), contents);
     assert_eq!(git::get_diff_base(&file, true).unwrap(), contents);
 }
+
+/// Test that `get_diff_base` works in a linked worktree whose `gitdir` files hold relative paths.
+///
+/// jj writes relative paths when it adds a workspace to a colocated repository, and so does
+/// `git worktree add --relative-paths`. The paths are rewritten by hand here so that the test
+/// does not depend on a recent git version.
+#[test]
+fn linked_worktree_with_relative_gitdir() {
+    let root = tempfile::tempdir().expect("create temp dir");
+    let main = root.path().join("main");
+    std::fs::create_dir(&main).unwrap();
+    exec_git_cmd("init", &main);
+    exec_git_cmd("config user.email test@helix.org", &main);
+    exec_git_cmd("config user.name helix-test", &main);
+
+    let contents = b"foo".as_slice();
+    File::create(main.join("file.txt"))
+        .unwrap()
+        .write_all(contents)
+        .unwrap();
+    create_commit(&main, true);
+    exec_git_cmd("worktree add --detach ../ws", &main);
+
+    let ws = root.path().join("ws");
+    std::fs::write(ws.join(".git"), "gitdir: ../main/.git/worktrees/ws\n").unwrap();
+    std::fs::write(
+        main.join(".git/worktrees/ws/gitdir"),
+        "../../../../ws/.git\n",
+    )
+    .unwrap();
+
+    let file = ws.join("file.txt");
+    File::create(&file).unwrap().write_all(b"bar").unwrap();
+
+    assert_eq!(
+        git::get_diff_base(&file, true).unwrap(),
+        Vec::from(contents)
+    );
+    assert_eq!(
+        git::get_diff_base(&file, false).unwrap(),
+        Vec::from(contents)
+    );
+}
